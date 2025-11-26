@@ -176,9 +176,24 @@
             { id: 4, name: 'Pickleball', value: 0 }
         ];
 
+        // Persistent Color Cache
+        const CHART_COLORS = [
+            '#4F46E5', '#10B981', '#F59E0B', '#EC4899', 
+            '#3B82F6', '#8B5CF6', '#EF4444', '#6366F1'
+        ];
+
         let categories = [];
         let chartInstance = null;
         let editingId = null;
+
+        // --- Helper: Get Colors Stable ---
+        function getColors(count) {
+            // Expand colors if needed, but keep them stable
+            while (CHART_COLORS.length < count) {
+                CHART_COLORS.push('#' + Math.floor(Math.random()*16777215).toString(16));
+            }
+            return CHART_COLORS.slice(0, count);
+        }
 
         // --- Initialization ---
         window.addEventListener('load', () => {
@@ -391,26 +406,14 @@
         function initChart() {
             const ctx = document.getElementById('allocationChart').getContext('2d');
             
-            // Color Palette
-            const colors = [
-                '#4F46E5', // Indigo 600
-                '#10B981', // Emerald 500
-                '#F59E0B', // Amber 500
-                '#EC4899', // Pink 500
-                '#3B82F6', // Blue 500
-                '#8B5CF6', // Violet 500
-                '#EF4444', // Red 500
-                '#6366F1'  // Indigo 500
-            ];
-
-            // Initialize with simplified structure (No background track dataset)
+            // Initialize with simplified structure
             chartInstance = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
                     labels: [],
                     datasets: [{
                         data: [],
-                        backgroundColor: colors,
+                        backgroundColor: [],
                         borderWidth: 0,
                         hoverOffset: 4
                     }]
@@ -467,39 +470,44 @@
             const total = categories.reduce((sum, c) => sum + c.value, 0);
             const remaining = Math.max(0, MAX_BUDGET - total);
 
-            // Create Data Arrays
-            const labels = categories.map(c => c.name);
-            const values = categories.map(c => c.value);
+            // 1. Calculate Target Data
+            // ------------------------
+            const newLabels = categories.map(c => c.name);
+            newLabels.push('Remaining');
             
-            // ALWAYS add 'Remaining' to maintain array length consistency
-            // This prevents Chart.js from thinking the dataset structure changed
-            labels.push('Remaining');
-            values.push(remaining);
+            const newValues = categories.map(c => c.value);
+            newValues.push(remaining);
 
-            // Colors mapping
-            const baseColors = [
-                '#4F46E5', '#10B981', '#F59E0B', '#EC4899', 
-                '#3B82F6', '#8B5CF6', '#EF4444', '#6366F1'
-            ];
-            // Ensure enough colors
-            while (baseColors.length < categories.length) {
-                baseColors.push('#' + Math.floor(Math.random()*16777215).toString(16));
-            }
-            
-            const bgColors = baseColors.slice(0, categories.length);
-            // Always push gray for remaining
-            bgColors.push('#F3F4F6'); 
+            // Get colors (cached)
+            const baseColors = getColors(categories.length);
+            const bgColors = [...baseColors, '#F3F4F6']; // Copy array and add gray
 
-            // MODIFY DATASET IN PLACE
+            // 2. Efficient In-Place Update
+            // ----------------------------
             const dataset = chartInstance.data.datasets[0];
-            
-            chartInstance.data.labels = labels;
-            dataset.data = values;
-            dataset.backgroundColor = bgColors;
+            const currentLength = dataset.data.length;
+
+            // Check if the structure (number of segments) is the same.
+            // If it is, update indices directly to avoid array reference change (flicker cause).
+            if (currentLength === newValues.length) {
+                for (let i = 0; i < newValues.length; i++) {
+                    dataset.data[i] = newValues[i];
+                    dataset.backgroundColor[i] = bgColors[i];
+                    chartInstance.data.labels[i] = newLabels[i];
+                }
+            } else {
+                // Only if user Added/Deleted a category do we replace the arrays
+                chartInstance.data.labels = newLabels;
+                dataset.data = newValues;
+                dataset.backgroundColor = bgColors;
+            }
+
+            // Ensure styles
             dataset.borderWidth = 2;
             dataset.borderColor = '#ffffff';
 
-            // Use 'none' mode for slider updates to prevent flickering animations
+            // 3. Render
+            // ---------
             chartInstance.update(animate ? 'default' : 'none');
         }
 
