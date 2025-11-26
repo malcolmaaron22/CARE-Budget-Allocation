@@ -6,8 +6,8 @@
     <title>CARE Utilization Planner</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js (Version Locked for Stability) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -403,6 +403,7 @@
                 '#6366F1'  // Indigo 500
             ];
 
+            // Initialize with simplified structure (No background track dataset)
             chartInstance = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
@@ -412,18 +413,12 @@
                         backgroundColor: colors,
                         borderWidth: 0,
                         hoverOffset: 4
-                    }, {
-                        // Background track for empty space
-                        data: [1],
-                        backgroundColor: ['#F3F4F6'],
-                        borderWidth: 0,
-                        weight: 0.2 // Thinner ring behind if needed, but using logic below is better
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    cutout: '75%', // Thinner donut
+                    cutout: '75%',
                     plugins: {
                         legend: {
                             position: 'bottom',
@@ -476,11 +471,10 @@
             const labels = categories.map(c => c.name);
             const values = categories.map(c => c.value);
             
-            // Add 'Remaining' section to chart if budget isn't full
-            if (remaining > 0) {
-                labels.push('Remaining');
-                values.push(remaining);
-            }
+            // ALWAYS add 'Remaining' to maintain array length consistency
+            // This prevents Chart.js from thinking the dataset structure changed
+            labels.push('Remaining');
+            values.push(remaining);
 
             // Colors mapping
             const baseColors = [
@@ -493,12 +487,10 @@
             }
             
             const bgColors = baseColors.slice(0, categories.length);
-            if (remaining > 0) {
-                bgColors.push('#F3F4F6'); // Gray for remaining
-            }
+            // Always push gray for remaining
+            bgColors.push('#F3F4F6'); 
 
-            // MODIFY DATASET IN PLACE instead of replacing it
-            // This prevents the "reset" animation
+            // MODIFY DATASET IN PLACE
             const dataset = chartInstance.data.datasets[0];
             
             chartInstance.data.labels = labels;
@@ -507,13 +499,7 @@
             dataset.borderWidth = 2;
             dataset.borderColor = '#ffffff';
 
-            // Clean up the background track dataset if it still exists (from init)
-            // We only need the main dataset now as "Remaining" handles the empty space
-            if (chartInstance.data.datasets.length > 1) {
-                chartInstance.data.datasets.splice(1);
-            }
-            
-            // Use 'none' mode when animating sliders to prevent flickering
+            // Use 'none' mode for slider updates to prevent flickering animations
             chartInstance.update(animate ? 'default' : 'none');
         }
 
