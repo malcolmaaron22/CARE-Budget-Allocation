@@ -217,7 +217,7 @@
                 categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
                 saveData();
                 renderCategories();
-                updateChart();
+                updateChart(true);
                 updateSummary();
             }
         }
@@ -228,7 +228,7 @@
             categories.push({ id, name: 'New Category', value: 0 });
             saveData();
             renderCategories();
-            updateChart();
+            updateChart(true);
         }
 
         function deleteCategory(id) {
@@ -240,7 +240,7 @@
                 categories = categories.filter(c => c.id !== id);
                 saveData();
                 renderCategories();
-                updateChart();
+                updateChart(true);
                 updateSummary();
             }
         }
@@ -268,7 +268,7 @@
                 if (cat) cat.name = newName;
                 saveData();
                 renderCategories(); // Re-render to update name
-                updateChart();
+                updateChart(true);
             }
             closeEditModal();
         }
@@ -303,7 +303,7 @@
             
             // Update Visuals
             saveData();
-            updateChart();
+            updateChart(false); // Pass false to prevent animation reset
             updateSummary();
         }
 
@@ -463,10 +463,10 @@
                     }
                 }
             });
-            updateChart();
+            updateChart(true);
         }
 
-        function updateChart() {
+        function updateChart(animate = true) {
             if (!chartInstance) return;
 
             const total = categories.reduce((sum, c) => sum + c.value, 0);
@@ -497,16 +497,24 @@
                 bgColors.push('#F3F4F6'); // Gray for remaining
             }
 
-            chartInstance.data.labels = labels;
-            chartInstance.data.datasets = [{
-                data: values,
-                backgroundColor: bgColors,
-                borderWidth: 2,
-                borderColor: '#ffffff',
-                hoverOffset: 4
-            }];
+            // MODIFY DATASET IN PLACE instead of replacing it
+            // This prevents the "reset" animation
+            const dataset = chartInstance.data.datasets[0];
             
-            chartInstance.update();
+            chartInstance.data.labels = labels;
+            dataset.data = values;
+            dataset.backgroundColor = bgColors;
+            dataset.borderWidth = 2;
+            dataset.borderColor = '#ffffff';
+
+            // Clean up the background track dataset if it still exists (from init)
+            // We only need the main dataset now as "Remaining" handles the empty space
+            if (chartInstance.data.datasets.length > 1) {
+                chartInstance.data.datasets.splice(1);
+            }
+            
+            // Use 'none' mode when animating sliders to prevent flickering
+            chartInstance.update(animate ? 'default' : 'none');
         }
 
         // Close modal on outside click
